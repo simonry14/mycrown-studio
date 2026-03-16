@@ -163,6 +163,7 @@ export default function App() {
   const [sidePanel, setSidePanel] = useState(true);
   const [error, setError] = useState(null);
   const [isMobile] = useState(() => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768);
+  const [teleprompterMode, setTeleprompterMode] = useState(false);
 
   const screenRef = useRef(null);
   const camRef = useRef(null);
@@ -366,6 +367,18 @@ export default function App() {
     a.download = `mycrown_${SCRIPTS[selectedScript].title.replace(/\s+/g,"_")}_${Date.now()}.webm`; a.click();
   }
 
+  function startTeleprompter() {
+    setError(null);
+    setTeleprompterMode(true);
+    setMode("recording"); setElapsed(0); setCurrentShot(0);
+    const st = Date.now();
+    timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now()-st)/1000)), 200);
+  }
+  function stopTeleprompter() {
+    clearInterval(timerRef.current);
+    setTeleprompterMode(false); setMode("idle"); setElapsed(0);
+  }
+
   function addOverlay() { setOverlays(p => [...p, makeOverlay("New text")]); }
   function updateOv(id, f, v) { setOverlays(p => p.map(o => o.id===id ? {...o,[f]:v} : o)); }
   function removeOv(id) { setOverlays(p => p.filter(o => o.id !== id)); }
@@ -382,7 +395,7 @@ export default function App() {
   function prevShot() { setCurrentShot(Math.max(0, currentShot - 1)); }
 
   const fmt = s => `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
-  const isActive = mode === "recording" || mode === "paused" || mode === "countdown";
+  const isActive = mode === "recording" || mode === "paused" || mode === "countdown" || teleprompterMode;
 
   const B = (bg, fg, extra={}) => ({
     background:bg, color:fg, border:"none", borderRadius:"8px", padding:"8px 14px",
@@ -702,14 +715,18 @@ export default function App() {
               </div>
             )}
 
-            {mode==="idle" && !screenStream && (
+            {mode==="idle" && !screenStream && !teleprompterMode && (
               <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center",
                 justifyContent:"center", gap:"12px", background:"linear-gradient(180deg,#0e0c0a,#1a1610)", padding:"20px" }}>
                 <div style={{ fontSize:"48px" }}>👑</div>
-                <div style={{ fontSize:"20px", fontWeight:800, color:"#d4a017" }}>Ready to Record</div>
+                <div style={{ fontSize: isMobile ? "18px" : "20px", fontWeight:800, color:"#d4a017" }}>Ready to Record</div>
                 <div style={{ fontSize:"13px", color:"#6a6560", textAlign:"center", maxWidth:"380px", lineHeight:1.6 }}>
-                  Open <b style={{color:"#d4a017"}}>{appUrl}</b> in another tab first.<br/>
-                  Hit Record → share that tab → follow the script.
+                  {isMobile ? (<>
+                    Use <b style={{color:"#d4a017"}}>Teleprompter</b> to follow the script while you record with your phone's built-in screen recorder.
+                  </>) : (<>
+                    Open <b style={{color:"#d4a017"}}>{appUrl}</b> in another tab first.<br/>
+                    Hit Record → share that tab → follow the script.
+                  </>)}
                 </div>
                 {error && (
                   <div style={{ background:"rgba(220,40,40,0.15)", border:"1px solid rgba(220,40,40,0.4)",
@@ -717,6 +734,35 @@ export default function App() {
                     <div style={{ fontSize:"13px", color:"#ff6b6b", lineHeight:1.5 }}>{error}</div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {teleprompterMode && (
+              <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column",
+                background:"linear-gradient(180deg,#0e0c0a,#1a1610)", padding:"16px", overflowY:"auto" }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"12px", flexShrink:0 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                    <div style={{ width:"10px",height:"10px",borderRadius:"50%",background:"#dc2828",animation:"pulse 1s infinite" }} />
+                    <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"18px", fontWeight:700, color:"#dc2828" }}>{fmt(elapsed)}</span>
+                  </div>
+                  <span style={{ fontSize:"12px", fontWeight:700, color:"#d4a017", fontFamily:"'JetBrains Mono',monospace" }}>
+                    Shot {currentShot+1}/{SCRIPTS[selectedScript].shots.length}
+                  </span>
+                </div>
+
+                {(() => { const shot = SCRIPTS[selectedScript].shots[currentShot]; return (
+                  <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"center", gap:"16px" }}>
+                    <div style={{ fontSize:"14px", fontWeight:700, color:"#d4a017", fontFamily:"'JetBrains Mono',monospace", textAlign:"center" }}>{shot.time}</div>
+                    <div style={{ fontSize: isMobile ? "18px" : "22px", fontWeight:700, color:"#e8e0d4", textAlign:"center", lineHeight:1.5, padding:"0 8px" }}>{shot.action}</div>
+                    {shot.overlay && <div style={{ fontSize:"16px", color:"#d4a017", textAlign:"center", fontStyle:"italic" }}>Overlay: "{shot.overlay}"</div>}
+                    {shot.tip && <div style={{ fontSize:"13px", color:"#6a6560", textAlign:"center" }}>💡 {shot.tip}</div>}
+                  </div>
+                ); })()}
+
+                <div style={{ display:"flex", gap:"8px", justifyContent:"center", marginTop:"12px", flexShrink:0 }}>
+                  <button onClick={prevShot} style={B("#2a2520","#e8e0d4",{padding:"12px 20px",fontSize:"15px",flex:1,justifyContent:"center"})}>◀ Prev</button>
+                  <button onClick={nextShot} style={B("#2a2520","#e8e0d4",{padding:"12px 20px",fontSize:"15px",flex:1,justifyContent:"center"})}>Next ▶</button>
+                </div>
               </div>
             )}
 
@@ -742,15 +788,24 @@ export default function App() {
             background:"#161310", borderTop:"1px solid #2a2520", padding: isMobile ? "10px 10px" : "10px 16px",
             display:"flex", alignItems:"center", justifyContent:"center", gap: isMobile ? "6px" : "10px", flexShrink:0, flexWrap:"wrap",
           }}>
-            {(mode==="idle"||mode==="done") ? (
+            {(mode==="idle"||mode==="done") && !teleprompterMode ? (<>
+              {isMobile && (
+                <button onClick={startTeleprompter} style={B("#d4a017","#1a1610",{padding:"14px 28px", fontSize:"16px", borderRadius:"10px"})}>
+                  📋 Teleprompter
+                </button>
+              )}
               <button onClick={handleRecord} style={B("#dc2828","#fff",{padding: isMobile ? "14px 28px" : "11px 24px", fontSize: isMobile ? "16px" : "14px", borderRadius:"10px"})}>
                 <div style={{ width:"12px",height:"12px",borderRadius:"50%",background:"#fff" }} /> Record
               </button>
-            ) : <>
+            </>) : teleprompterMode ? (
+              <button onClick={stopTeleprompter} style={B("#dc2828","#fff",{padding: isMobile ? "14px 28px" : "11px 24px", fontSize: isMobile ? "16px" : "14px", borderRadius:"10px"})}>
+                ⏹ Stop Teleprompter
+              </button>
+            ) : (<>
               {mode==="recording" && <button onClick={handlePause} style={B("#d4a017","#1a1610",{padding: isMobile ? "12px 18px" : "9px 16px", fontSize: isMobile ? "15px" : "13px"})}>⏸ Pause</button>}
               {mode==="paused" && <button onClick={handleResume} style={B("#22c55e","#fff",{padding: isMobile ? "12px 18px" : "9px 16px", fontSize: isMobile ? "15px" : "13px"})}>▶ Resume</button>}
               {(mode==="recording"||mode==="paused") && <button onClick={handleStop} style={B("#dc2828","#fff",{padding: isMobile ? "12px 18px" : "9px 16px", fontSize: isMobile ? "15px" : "13px"})}>⏹ Stop</button>}
-            </>}
+            </>)}
 
             {/* Shot stepper (visible during recording) */}
             {isActive && (
