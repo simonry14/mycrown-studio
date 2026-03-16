@@ -172,9 +172,12 @@ export default function App() {
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const animRef = useRef(null);
+  const stoppingRef = useRef(false);
+  const elapsedRef = useRef(0);
   const overlaysRef = useRef(overlays);
   const brandRef = useRef({ showBrand, brandText, brandPos, appUrl });
 
+  useEffect(() => { elapsedRef.current = elapsed; }, [elapsed]);
   useEffect(() => { overlaysRef.current = overlays; }, [overlays]);
   useEffect(() => { brandRef.current = { showBrand, brandText, brandPos, appUrl }; }, [showBrand, brandText, brandPos, appUrl]);
 
@@ -310,6 +313,8 @@ export default function App() {
   }
 
   function stopAll() {
+    // If handleStop is already in progress, don't interfere
+    if (stoppingRef.current) return;
     if (recorderRef.current?.state !== "inactive") try { recorderRef.current?.stop(); } catch(e) {}
     if (timerRef.current) clearInterval(timerRef.current);
     screenStream?.getTracks().forEach(t => t.stop());
@@ -355,11 +360,30 @@ export default function App() {
     setMode("recording");
   }
   function handleStop() {
-    if (recorderRef.current?.state !== "inactive") recorderRef.current.stop();
+    stoppingRef.current = true;
     clearInterval(timerRef.current);
-    screenStream?.getTracks().forEach(t => t.stop()); camStream?.getTracks().forEach(t => t.stop());
-    if (animRef.current) cancelAnimationFrame(animRef.current);
-    setScreenStream(null); setCamStream(null); setShowCam(false);
+    const finalElapsed = elapsedRef.current;
+    // Stop the recorder first, then clean up tracks after onstop fires
+    if (recorderRef.current?.state !== "inactive") {
+      const rec = recorderRef.current;
+      rec.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "video/webm" });
+        setRecordedBlob(blob); setRecordedUrl(URL.createObjectURL(blob));
+        setElapsed(finalElapsed); setMode("done");
+        // Now clean up tracks
+        screenStream?.getTracks().forEach(t => t.stop());
+        camStream?.getTracks().forEach(t => t.stop());
+        if (animRef.current) cancelAnimationFrame(animRef.current);
+        setScreenStream(null); setCamStream(null); setShowCam(false);
+        stoppingRef.current = false;
+      };
+      rec.stop();
+    } else {
+      screenStream?.getTracks().forEach(t => t.stop()); camStream?.getTracks().forEach(t => t.stop());
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      setScreenStream(null); setCamStream(null); setShowCam(false);
+      stoppingRef.current = false;
+    }
   }
   function downloadRec() {
     if (!recordedBlob) return;
