@@ -8,7 +8,12 @@
     <title>MyCrown Studio</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { background: #0e0c0a; overflow: hidden; }
+      body { background: #0e0c0a; overflow-x: hidden; overflow-y: auto; }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: #161310; }
+      ::-webkit-scrollbar-thumb { background: #3a3530; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #4a4540; }
+      * { scrollbar-width: thin; scrollbar-color: #3a3530 #161310; }
     </style>
   </head>
   <body>

@@ -390,6 +390,7 @@ export default function App() {
       minHeight:"100vh", background:"linear-gradient(180deg,#0e0c0a 0%,#1a1610 100%)",
       color:"#e8e0d4", fontFamily:"'Segoe UI',system-ui,sans-serif",
       display:"flex", alignItems:"center", justifyContent:"center", padding:"24px",
+      overflowY:"auto",
     }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
       <div style={{ maxWidth:"560px", width:"100%" }}>
