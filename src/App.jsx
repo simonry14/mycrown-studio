@@ -268,13 +268,11 @@ export default function App() {
 
   async function startScreen() {
     setError(null);
-    if (!navigator.mediaDevices?.getDisplayMedia) {
-      setError("Screen sharing is not supported on this browser. Please use Chrome, Edge, or Firefox on a desktop/laptop.");
-      return null;
-    }
     try {
+      const idealW = isMobile ? 1280 : 1920;
+      const idealH = isMobile ? 720 : 1080;
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+        video: { width: { ideal: idealW }, height: { ideal: idealH }, frameRate: { ideal: 30 } },
         audio: audioOpt === "system" || audioOpt === "both",
       });
       setScreenStream(stream);
@@ -282,13 +280,15 @@ export default function App() {
       stream.getVideoTracks()[0].onended = () => stopAll();
       const canvas = canvasRef.current;
       const s = stream.getVideoTracks()[0].getSettings();
-      canvas.width = s.width || 1920; canvas.height = s.height || 1080;
+      canvas.width = s.width || idealW; canvas.height = s.height || idealH;
       if (animRef.current) cancelAnimationFrame(animRef.current);
       animRef.current = requestAnimationFrame(drawFrame);
       return stream;
     } catch(e) {
       if (e.name === "NotAllowedError") {
-        setError("Screen sharing was cancelled. Click Record and select a tab or screen to share.");
+        setError("Screen sharing was cancelled. Tap Record and select a screen to share.");
+      } else if (e.name === "NotSupportedError" || !navigator.mediaDevices?.getDisplayMedia) {
+        setError("Screen sharing is not supported on this browser. Try Chrome on desktop, or update your browser.");
       } else {
         setError("Could not start screen sharing: " + e.message);
       }
