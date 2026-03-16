@@ -161,6 +161,8 @@ export default function App() {
   const [recordedBlob, setRecordedBlob] = useState(null);
   const [audioOpt, setAudioOpt] = useState("none");
   const [sidePanel, setSidePanel] = useState(true);
+  const [error, setError] = useState(null);
+  const [isMobile] = useState(() => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768);
 
   const screenRef = useRef(null);
   const camRef = useRef(null);
@@ -265,6 +267,11 @@ export default function App() {
   }, [showCam, pipPos, pipShape, pipSize]);
 
   async function startScreen() {
+    setError(null);
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      setError("Screen sharing is not supported on this browser. Please use Chrome, Edge, or Firefox on a desktop/laptop.");
+      return null;
+    }
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
@@ -279,7 +286,14 @@ export default function App() {
       if (animRef.current) cancelAnimationFrame(animRef.current);
       animRef.current = requestAnimationFrame(drawFrame);
       return stream;
-    } catch(e) { return null; }
+    } catch(e) {
+      if (e.name === "NotAllowedError") {
+        setError("Screen sharing was cancelled. Click Record and select a tab or screen to share.");
+      } else {
+        setError("Could not start screen sharing: " + e.message);
+      }
+      return null;
+    }
   }
 
   async function startCam() {
@@ -389,14 +403,14 @@ export default function App() {
     <div style={{
       minHeight:"100vh", background:"linear-gradient(180deg,#0e0c0a 0%,#1a1610 100%)",
       color:"#e8e0d4", fontFamily:"'Segoe UI',system-ui,sans-serif",
-      display:"flex", alignItems:"center", justifyContent:"center", padding:"24px",
-      overflowY:"auto",
+      display:"flex", alignItems:"center", justifyContent:"center",
+      padding: isMobile ? "16px" : "24px", overflowY:"auto",
     }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
       <div style={{ maxWidth:"560px", width:"100%" }}>
         <div style={{ textAlign:"center", marginBottom:"36px" }}>
           <div style={{ fontSize:"48px", marginBottom:"8px" }}>👑</div>
-          <h1 style={{ margin:0, fontSize:"32px", fontWeight:900, color:"#d4a017", letterSpacing:"-0.03em" }}>MyCrown Studio</h1>
+          <h1 style={{ margin:0, fontSize: isMobile ? "24px" : "32px", fontWeight:900, color:"#d4a017", letterSpacing:"-0.03em" }}>MyCrown Studio</h1>
           <p style={{ margin:"8px 0 0", color:"#8a7d6b", fontSize:"14px" }}>Screen Recording Suite for App Promo Videos</p>
         </div>
 
@@ -424,7 +438,7 @@ export default function App() {
         {/* Branding config */}
         <div style={{ background:"#161310", borderRadius:"14px", border:"1px solid #2a2520", padding:"20px", marginBottom:"20px" }}>
           <div style={{ ...lbl, fontSize:"11px", color:"#d4a017", marginBottom:"12px" }}>BRANDING SETUP</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:"12px" }}>
             <div>
               <span style={lbl}>App URL (shown in watermark)</span>
               <input value={appUrl} onChange={e=>setAppUrl(e.target.value)} style={inp} placeholder="mycrown.ai" />
@@ -498,12 +512,12 @@ export default function App() {
       {/* Header */}
       <div style={{
         background:"linear-gradient(135deg,#1a1610,#2a2520)", borderBottom:"2px solid #2a2520",
-        padding:"8px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0,
+        padding: isMobile ? "8px 10px" : "8px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0,
       }}>
-        <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-          <button onClick={()=>setView("setup")} style={B("transparent","#8a7d6b",{padding:"6px 10px",fontSize:"12px"})}>← Setup</button>
+        <div style={{ display:"flex", alignItems:"center", gap: isMobile ? "6px" : "10px" }}>
+          <button onClick={()=>setView("setup")} style={B("transparent","#8a7d6b",{padding:"6px 10px",fontSize:"12px"})}>←</button>
           <span style={{ fontSize:"16px" }}>👑</span>
-          <span style={{ fontWeight:800, color:"#d4a017", fontSize:"15px" }}>MyCrown Studio</span>
+          {!isMobile && <span style={{ fontWeight:800, color:"#d4a017", fontSize:"15px" }}>MyCrown Studio</span>}
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
           {(mode==="recording"||mode==="paused") && (
@@ -516,14 +530,18 @@ export default function App() {
             </div>
           )}
           <button onClick={()=>setSidePanel(p=>!p)} style={B("#2a2520","#8a7d6b",{padding:"6px 10px",fontSize:"11px"})}>
-            {sidePanel?"◀ Panel":"▶ Panel"}
+            {sidePanel ? (isMobile ? "▼ Panel" : "◀ Panel") : (isMobile ? "▲ Panel" : "▶ Panel")}
           </button>
         </div>
       </div>
 
-      <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
+      <div style={{ display:"flex", flexDirection: isMobile ? "column" : "row", flex:1, overflow:"hidden" }}>
         {/* Sidebar */}
-        <div style={{
+        <div style={isMobile ? {
+          height: sidePanel ? "45vh" : "0px", maxHeight: sidePanel ? "45vh" : "0px",
+          background:"#161310", borderBottom:"1px solid #2a2520", display:"flex",
+          flexDirection:"column", overflow:"hidden", transition:"all .25s", order:2,
+        } : {
           width: sidePanel?"310px":"0px", minWidth: sidePanel?"310px":"0px",
           background:"#161310", borderRight:"1px solid #2a2520", display:"flex",
           flexDirection:"column", overflow:"hidden", transition:"all .25s",
@@ -599,7 +617,7 @@ export default function App() {
                     </div>
                     <input value={ov.text} onChange={e=>updateOv(ov.id,"text",e.target.value)}
                       style={{ ...inp, marginBottom:"6px", fontWeight:600 }} />
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"4px" }}>
+                    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:"6px" }}>
                       <div><span style={lbl}>Position</span>
                         <select value={ov.position} onChange={e=>updateOv(ov.id,"position",e.target.value)} style={sel}>
                           {OVERLAY_POSITIONS.map(p=><option key={p} value={p}>{p}</option>)}
@@ -609,9 +627,9 @@ export default function App() {
                           {OVERLAY_STYLES_LIST.map(s=><option key={s} value={s}>{s}</option>)}
                         </select></div>
                       <div><span style={lbl}>Color</span>
-                        <div style={{ display:"flex", gap:"3px" }}>
+                        <div style={{ display:"flex", gap: isMobile ? "6px" : "3px", flexWrap:"wrap" }}>
                           {COLORS.map(c=><div key={c} onClick={()=>updateOv(ov.id,"color",c)} style={{
-                            width:"22px",height:"22px",borderRadius:"5px",background:c,cursor:"pointer",
+                            width: isMobile ? "30px" : "22px", height: isMobile ? "30px" : "22px", borderRadius:"5px", background:c, cursor:"pointer",
                             border: ov.color===c?"2px solid #d4a017":"2px solid #333",
                           }} />)}
                         </div></div>
@@ -668,8 +686,8 @@ export default function App() {
         </div>
 
         {/* Main */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-          <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", position:"relative", background:"#0a0908", overflow:"hidden" }}>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", order: isMobile ? 1 : undefined }}>
+          <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", position:"relative", background:"#0a0908", overflow:"hidden", minHeight: isMobile ? "200px" : undefined }}>
             <video ref={screenRef} style={{ display:"none" }} muted playsInline />
             <video ref={camRef} style={{ display:"none" }} muted playsInline />
             <canvas ref={canvasRef} width={1920} height={1080} style={{
@@ -679,34 +697,40 @@ export default function App() {
 
             {mode==="countdown" && countdown>0 && (
               <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(0,0,0,.7)", zIndex:10 }}>
-                <div style={{ fontSize:"120px", fontWeight:900, color:"#d4a017",
+                <div style={{ fontSize: isMobile ? "72px" : "120px", fontWeight:900, color:"#d4a017",
                   fontFamily:"'JetBrains Mono',monospace", textShadow:"0 0 40px rgba(212,160,23,.5)" }}>{countdown}</div>
               </div>
             )}
 
             {mode==="idle" && !screenStream && (
               <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center",
-                justifyContent:"center", gap:"12px", background:"linear-gradient(180deg,#0e0c0a,#1a1610)" }}>
+                justifyContent:"center", gap:"12px", background:"linear-gradient(180deg,#0e0c0a,#1a1610)", padding:"20px" }}>
                 <div style={{ fontSize:"48px" }}>👑</div>
                 <div style={{ fontSize:"20px", fontWeight:800, color:"#d4a017" }}>Ready to Record</div>
                 <div style={{ fontSize:"13px", color:"#6a6560", textAlign:"center", maxWidth:"380px", lineHeight:1.6 }}>
                   Open <b style={{color:"#d4a017"}}>{appUrl}</b> in another tab first.<br/>
                   Hit Record → share that tab → follow the script.
                 </div>
+                {error && (
+                  <div style={{ background:"rgba(220,40,40,0.15)", border:"1px solid rgba(220,40,40,0.4)",
+                    borderRadius:"10px", padding:"12px 16px", maxWidth:"400px", textAlign:"center", marginTop:"8px" }}>
+                    <div style={{ fontSize:"13px", color:"#ff6b6b", lineHeight:1.5 }}>{error}</div>
+                  </div>
+                )}
               </div>
             )}
 
             {mode==="done" && recordedUrl && (
               <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center",
-                justifyContent:"center", gap:"14px", background:"rgba(0,0,0,.88)", zIndex:10 }}>
-                <div style={{ fontSize:"40px" }}>✅</div>
-                <div style={{ fontSize:"16px", fontWeight:700, color:"#d4a017" }}>Recording Complete — {fmt(elapsed)}</div>
-                <video src={recordedUrl} controls style={{ maxWidth:"75%", maxHeight:"45%", borderRadius:"10px", border:"2px solid #2a2520" }} />
-                <div style={{ display:"flex", gap:"8px" }}>
-                  <button onClick={downloadRec} style={B("#d4a017","#1a1610",{padding:"10px 20px",fontSize:"14px"})}>⬇ Download .webm</button>
-                  <button onClick={()=>{setMode("idle");setRecordedUrl(null);}} style={B("#2a2520","#e8e0d4",{padding:"10px 20px",fontSize:"14px"})}>🔄 New Recording</button>
+                justifyContent:"center", gap: isMobile ? "10px" : "14px", background:"rgba(0,0,0,.88)", zIndex:10, padding: isMobile ? "16px" : "0", overflowY:"auto" }}>
+                <div style={{ fontSize: isMobile ? "32px" : "40px" }}>✅</div>
+                <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight:700, color:"#d4a017" }}>Recording Complete — {fmt(elapsed)}</div>
+                <video src={recordedUrl} controls style={{ maxWidth: isMobile ? "95%" : "75%", maxHeight: isMobile ? "35%" : "45%", borderRadius:"10px", border:"2px solid #2a2520" }} />
+                <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", justifyContent:"center" }}>
+                  <button onClick={downloadRec} style={B("#d4a017","#1a1610",{padding: isMobile ? "12px 18px" : "10px 20px", fontSize:"14px"})}>⬇ Download .webm</button>
+                  <button onClick={()=>{setMode("idle");setRecordedUrl(null);}} style={B("#2a2520","#e8e0d4",{padding: isMobile ? "12px 18px" : "10px 20px", fontSize:"14px"})}>🔄 New Recording</button>
                 </div>
-                <p style={{ fontSize:"12px", color:"#6a6560", maxWidth:"360px", textAlign:"center", lineHeight:1.5 }}>
+                <p style={{ fontSize:"12px", color:"#6a6560", maxWidth:"360px", textAlign:"center", lineHeight:1.5, padding:"0 12px" }}>
                   Import the .webm into CapCut → add trending sound → auto-captions → export 1080×1920 → upload to TikTok/Reels
                 </p>
               </div>
@@ -715,36 +739,36 @@ export default function App() {
 
           {/* Controls */}
           <div style={{
-            background:"#161310", borderTop:"1px solid #2a2520", padding:"10px 16px",
-            display:"flex", alignItems:"center", justifyContent:"center", gap:"10px", flexShrink:0, flexWrap:"wrap",
+            background:"#161310", borderTop:"1px solid #2a2520", padding: isMobile ? "10px 10px" : "10px 16px",
+            display:"flex", alignItems:"center", justifyContent:"center", gap: isMobile ? "6px" : "10px", flexShrink:0, flexWrap:"wrap",
           }}>
             {(mode==="idle"||mode==="done") ? (
-              <button onClick={handleRecord} style={B("#dc2828","#fff",{padding:"11px 24px",fontSize:"14px",borderRadius:"10px"})}>
+              <button onClick={handleRecord} style={B("#dc2828","#fff",{padding: isMobile ? "14px 28px" : "11px 24px", fontSize: isMobile ? "16px" : "14px", borderRadius:"10px"})}>
                 <div style={{ width:"12px",height:"12px",borderRadius:"50%",background:"#fff" }} /> Record
               </button>
             ) : <>
-              {mode==="recording" && <button onClick={handlePause} style={B("#d4a017","#1a1610",{padding:"9px 16px"})}>⏸ Pause</button>}
-              {mode==="paused" && <button onClick={handleResume} style={B("#22c55e","#fff",{padding:"9px 16px"})}>▶ Resume</button>}
-              {(mode==="recording"||mode==="paused") && <button onClick={handleStop} style={B("#dc2828","#fff",{padding:"9px 16px"})}>⏹ Stop</button>}
+              {mode==="recording" && <button onClick={handlePause} style={B("#d4a017","#1a1610",{padding: isMobile ? "12px 18px" : "9px 16px", fontSize: isMobile ? "15px" : "13px"})}>⏸ Pause</button>}
+              {mode==="paused" && <button onClick={handleResume} style={B("#22c55e","#fff",{padding: isMobile ? "12px 18px" : "9px 16px", fontSize: isMobile ? "15px" : "13px"})}>▶ Resume</button>}
+              {(mode==="recording"||mode==="paused") && <button onClick={handleStop} style={B("#dc2828","#fff",{padding: isMobile ? "12px 18px" : "9px 16px", fontSize: isMobile ? "15px" : "13px"})}>⏹ Stop</button>}
             </>}
 
             {/* Shot stepper (visible during recording) */}
             {isActive && (
-              <div style={{ display:"flex", alignItems:"center", gap:"6px", marginLeft:"12px",
+              <div style={{ display:"flex", alignItems:"center", gap:"6px", marginLeft: isMobile ? "4px" : "12px",
                 background:"#1e1a16", borderRadius:"8px", padding:"4px 8px" }}>
-                <button onClick={prevShot} style={B("transparent","#8a7d6b",{padding:"4px 8px",fontSize:"11px"})}>◀</button>
+                <button onClick={prevShot} style={B("transparent","#8a7d6b",{padding: isMobile ? "8px 12px" : "4px 8px", fontSize:"11px"})}>◀</button>
                 <span style={{ fontSize:"11px", fontFamily:"'JetBrains Mono',monospace", color:"#d4a017" }}>
                   Shot {currentShot+1}/{SCRIPTS[selectedScript].shots.length}
                 </span>
-                <button onClick={nextShot} style={B("transparent","#8a7d6b",{padding:"4px 8px",fontSize:"11px"})}>▶</button>
+                <button onClick={nextShot} style={B("transparent","#8a7d6b",{padding: isMobile ? "8px 12px" : "4px 8px", fontSize:"11px"})}>▶</button>
               </div>
             )}
 
             {isActive && overlays.length > 0 && (
-              <div style={{ display:"flex", gap:"4px", marginLeft:"8px" }}>
+              <div style={{ display:"flex", gap:"4px", marginLeft: isMobile ? "0" : "8px" }}>
                 {overlays.map((ov,i) => (
                   <button key={ov.id} onClick={()=>updateOv(ov.id,"visible",!ov.visible)}
-                    style={B(ov.visible?"#d4a017":"#2a2520",ov.visible?"#1a1610":"#6a6560",{padding:"5px 8px",fontSize:"10px"})}>
+                    style={B(ov.visible?"#d4a017":"#2a2520",ov.visible?"#1a1610":"#6a6560",{padding: isMobile ? "8px 12px" : "5px 8px", fontSize: isMobile ? "12px" : "10px"})}>
                     {i+1}:{ov.visible?"ON":"OFF"}
                   </button>
                 ))}
@@ -759,6 +783,11 @@ export default function App() {
         *{box-sizing:border-box;margin:0;padding:0}
         ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:#161310} ::-webkit-scrollbar-thumb{background:#3a3530;border-radius:3px}
         select option{background:#1e1a16;color:#e8e0d4}
+        @media(max-width:767px){
+          input,select,button{font-size:16px !important;min-height:44px}
+          input[type="range"]{min-height:auto}
+          input[type="checkbox"]{min-height:auto;width:20px;height:20px}
+        }
       `}</style>
     </div>
   );
